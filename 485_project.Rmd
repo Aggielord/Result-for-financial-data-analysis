@@ -1,0 +1,302 @@
+---
+title: "485_Project"
+author: "LinhanHu;Ruike Li"
+date: "April 23, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup}
+library(readr)
+X <- read_csv("C:/Users/sur/Desktop/Financial project/X_variable _new.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+
+Y <- read_csv("C:/Users/sur/Desktop/Financial project/Y_variable/Y/AEIS.csv", 
+    col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+
+```
+
+## Multiple regression model checking
+In its simplest form, a multiple linear regression model is a valid model for the data if the conditional mean of Y given X is a linear function of X and the conditional variance of Y given X is constant. In other words,  
+$E(Y|X=x) = \beta_0+\beta_1x_1+\beta_2x_2+\beta_3x_3+\beta_4x_4+...+\beta_px_p$ and $Var(Y|X = x) = \sigma^2$  
+When a valid model has been fit, a plot of standardized residuals, $r_i$ against any predictor or any linear combination of the predictors (such as the fitted values) will have the following features:
+*A random scatter of points around the horizontal axis, since the mean function
+of the $e_i$ is zero when a correct model has been fit
+*Constant variability as we look along the horizontal axis  
+
+An implication of these features is that **any pattern in a plot of standardized
+residuals is indicative that an invalid model has been fit to the data**. 
+
+```{r cars}
+#Full model.
+m1 <- lm(Y$Open~Y$High+Y$Low+Y$Close+Y$Volume+Y$Report_Released+Y$Positive+Y$Negative+Y$beta+Y$`p/e`+X$USD_RMB+X$USD_EUR+X$USD_JYP+X$payday+X$`interest rate`+X$Oil_price)
+summary(m1)
+
+m2 <- lm(Y$Open~Y$Volume+Y$Report_Released+Y$Positive+Y$Negative+Y$beta+Y$`p/e`+X$USD_RMB+X$USD_EUR+X$USD_JYP+X$payday+X$`interest rate`+X$Oil_price)
+summary(m2)
+
+pairs(Y$Open~Y$High+Y$Low+Y$Close+Y$Volume+Y$Report_Released+Y$Positive+Y$Negative+Y$beta+Y$`p/e`+X$USD_RMB+X$USD_EUR+X$USD_JYP+X$payday+X$`interest rate`+X$Oil_price)
+```
+```{r 2}
+plot(m2)
+abline(v=2*13/756,lty=2)
+```
+#Correlations between the predictors
+```{r 1}
+A <- cbind(Y$Volume,Y$Report_Released,Y$Positive,Y$Negative,Y$beta,Y$`p/e`,X$USD_RMB,X$USD_EUR,X$USD_JYP,X$payday,X$`interest rate`,X$Oil_price)
+c <- cor(A)
+round(c,3)
+```
+
+## Plots of standardized residuals against each predictor and the fitted values
+
+```{r pressure}
+StanRes1 <- rstandard(m2)
+par(mfrow=c(2,2))
+plot(Y$Volume,StanRes1, ylab="Standardized Residuals",xlab = "Volume")
+boxplot(StanRes1~Y$Report_Released, ylab="Standardized Residuals",xlab = "Report_Released")
+boxplot(StanRes1~Y$Positive, ylab="Standardized Residuals",xlab = "Positive")
+boxplot(StanRes1~Y$Negative, ylab="Standardized Residuals",xlab ="Negative")
+plot(Y$beta,StanRes1, ylab="Standardized Residuals",xlab = "beta")
+plot(Y$`p/e`,StanRes1, ylab="Standardized Residuals",xlab = "p/e ratio")
+plot(X$USD_RMB,StanRes1, ylab="Standardized Residuals",xlab = "USD_RMB")
+plot(X$USD_EUR,StanRes1, ylab="Standardized Residuals",xlab = "USD_EUR")
+plot(X$USD_JYP,StanRes1, ylab="Standardized Residuals",xlab = "USD_JYP")
+boxplot(StanRes1~X$payday, ylab="Standardized Residuals",xlab ="payday")
+plot(X$`interest rate`,StanRes1, ylab="Standardized Residuals",xlab = "Interest")
+plot(X$Oil_price,StanRes1, ylab="Standardized Residuals",xlab = "Oil price")
+plot(m2$fitted.values,StanRes1, ylab="Standardized Residuals",xlab="Fitted Values")
+
+```
+
+
+##Added-Variable Plot
+```{r step 2}
+library(car)
+avPlot(m2,variable=Y$Volume,ask=FALSE)
+avPlot(m2,variable=Y$Report_Released,ask=FALSE)
+avPlot(m2,variable=Y$Positive,ask=FALSE)
+avPlot(m2,variable=Y$Negative,ask=FALSE)
+avPlot(m2,variable=Y$beta,ask=FALSE)
+avPlot(m2,variable=Y$`p/e`,ask=FALSE)
+avPlot(m2,variable=X$USD_RMB,ask=FALSE)
+avPlot(m2,variable=X$USD_EUR,ask=FALSE)
+avPlot(m2,variable=X$USD_JYP,ask=FALSE)
+avPlot(m2,variable=X$payday,ask=FALSE)
+avPlot(m2,variable=X$`interest rate`,ask=FALSE)
+avPlot(m2,variable=X$Oil_price,ask=FALSE)
+
+```
+
+##Inverse response plot
+```{r step 3}
+library(alr3)
+inverse.response.plot(m2,key=TRUE)
+```
+
+## Log-likelihood for the Box-Cox transformation method
+```{r step 4}
+library(MASS)
+boxcox(m2,lambda=seq(-0.6,0,length=20))
+```
+
+```{r step 5}
+m3 <- update(m2, subset=(1:756)[-c(756)])
+summary(m3)
+plot(m3)
+abline(v=2*13/755,lty=2)
+```
+
+## Model selection 
+Conduct F- test to see if the coefficient is 0.
+```{r step 6}
+anova(m2)  ## conduct F- test to see if the coefficient is 0
+
+summary(powerTransform(m2))
+```
+
+```{r 3}
+
+Z=merge(X, Y, sort = FALSE)
+attach(Z)
+```
+
+
+
+Use leaps to determine which variable we should have.
+```{r step 7}
+#A <- cbind(Y$Volume,Y$Report_Released,Y$Positive,Y$Negative,Y$beta,Y$`p/e`,X$USD_RMB,X$USD_EUR,X$USD_JYP,X$payday,X$`interest rate`,X$Oil_price)
+B = cbind(Volume,Report_Released,Positive, Negative, beta, Z$`p/e` ,USD_EUR,USD_JYP, USD_RMB, payday,Z$`interest rate`, Oil_price)
+
+library(leaps)
+b = regsubsets(as.matrix(B),Open)
+rs <- summary(b)
+par(mfrow=c(1,1))
+plot(1:8,rs$adjr2,xlab="Subset Size",ylab="Adjusted R-squared")
+
+#subsets(b,statistic=c("adjr2"))
+```
+
+Using AIC, BIC, AICC to choose reduced model.
+```{r step 8}
+om1 <- lm(Y$Open~X$Oil_price)
+om2 <- lm(Y$Open~X$Oil_price+X$`interest rate`)
+om3 <- lm(Y$Open~X$Oil_price+X$`interest rate`+X$USD_RMB)
+om4 <- lm(Y$Open~X$Oil_price+X$`interest rate`+X$USD_RMB+X$USD_EUR)
+om5 <- lm(Y$Open~X$Oil_price+X$`interest rate`+X$USD_EUR+Y$Negative)
+om6 <- lm(Y$Open~X$Oil_price+X$`interest rate`+X$USD_EUR+Y$Negative +Y$Positive)
+#Y$Open~Y$Volume+Y$Report_Released+Y$Positive+Y$Negative+Y$beta+Y$`p/e`+X$USD_RMB+X$USD_EUR+X$USD_JYP+X$payday+X$`interest rate`+X$Oil_price
+#Calculate AIC
+extractAIC(om1,k=2)
+extractAIC(om2,k=2)
+extractAIC(om3,k=2)
+extractAIC(om4,k=2)
+extractAIC(om5,k=2)
+extractAIC(om6,k=2)
+#Calculate AICc
+n <- length(om1$residuals)
+npar <- length(om1$coefficients) +1
+extractAIC(om1,k=2)+2*npar*(npar+1)/(n-npar-1)
+npar <- length(om2$coefficients) +1
+extractAIC(om2,k=2)+2*npar*(npar+1)/(n-npar-1)
+npar <- length(om3$coefficients) +1
+extractAIC(om3,k=2)+2*npar*(npar+1)/(n-npar-1)
+npar <- length(om4$coefficients) +1
+extractAIC(om4,k=2)+2*npar*(npar+1)/(n-npar-1)
+npar <- length(om5$coefficients) +1
+extractAIC(om5,k=2)+2*npar*(npar+1)/(n-npar-1)
+npar <- length(om6$coefficients) +1
+extractAIC(om6,k=2)+2*npar*(npar+1)/(n-npar-1)
+
+#Calculate BIC
+extractAIC(om1,k=log(n))
+extractAIC(om2,k=log(n))
+extractAIC(om3,k=log(n))
+extractAIC(om4,k=log(n))
+extractAIC(om5,k=log(n))
+extractAIC(om6,k=log(n))
+
+```
+
+**base on AIC, AICC and BIC, we will choose model 4,which contains Oil_price,interest.rate,USD_RMB,USD_EUR**
+
+use backward selection based on AIC
+```{r step 9}
+om7 = m2
+backAIC <- step(om7,direction="backward")
+###########use backward selection based on BIC
+backBIC <- step(om7,direction="backward",k = log(n))
+###########Forward selection based on AIC
+mint <- lm(Open~1,data=Z)
+x1 = Volume
+x2 = Report_Released
+x3 =Positive
+x4 = Negative
+x5 = beta
+x6 = Z$`p/e`
+x7 = JYP_USD
+x8 = USD_RMB
+x9 = USD_EUR
+x10 = USD_JYP
+x11 = payday
+x12 = Z$`interest rate`
+x13 =Oil_price
+
+forwardAIC <- step(mint,scope=list(lower=~1,
+  upper=~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13),
+  direction="forward", data=Z)
+
+###Forward selection based on BIC
+forwardBIC <- step(mint,scope=list(lower=~1,
+  upper=~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13),
+  direction="forward", data=Z,k=log(n))
+#### the model choose the x8 + x12 + x9 + x13 + x4
+```
+
+#Based on the above method, we finally choose a 6 variable model with independent variables:Positive, Negative, Oil price, Interest rate, USD_RMB, USD_EUR
+```{r step 10}
+m5=lm(Y$Open~Y$Positive+Y$Negative+X$USD_RMB+X$USD_EUR+X$`interest rate`+X$Oil_price)
+
+summary(m5)
+pairs(Y$Open~Y$Positive+Y$Negative+X$USD_RMB+X$USD_EUR+X$`interest rate`+X$Oil_price)
+C <- cbind(Y$Positive,Y$Negative,X$USD_RMB,X$USD_EUR,X$`interest rate`,X$Oil_price)
+c <- cor(C)
+round(c,3)
+plot(m5)
+
+abline(v=2*7/756,lty=2)
+
+StanRes2 <- rstandard(m5)
+par(mfrow=c(2,2))
+
+boxplot(StanRes2~Y$Positive, ylab="Standardized Residuals",xlab = "Positive")
+boxplot(StanRes2~Y$Negative, ylab="Standardized Residuals",xlab ="Negative")
+plot(X$USD_RMB,StanRes2, ylab="Standardized Residuals",xlab = "USD_RMB")
+plot(X$USD_EUR,StanRes2, ylab="Standardized Residuals",xlab = "USD_EUR")
+plot(X$`interest rate`,StanRes2, ylab="Standardized Residuals",xlab = "Interest")
+plot(X$Oil_price,StanRes2, ylab="Standardized Residuals",xlab = "Oil price")
+plot(m5$fitted.values,StanRes2, ylab="Standardized Residuals",xlab="Fitted Values")
+
+
+avPlot(m2,variable=Y$Positive,ask=FALSE)
+avPlot(m2,variable=Y$Negative,ask=FALSE)
+avPlot(m2,variable=X$USD_RMB,ask=FALSE)
+avPlot(m2,variable=X$USD_EUR,ask=FALSE)
+avPlot(m2,variable=X$`interest rate`,ask=FALSE)
+avPlot(m2,variable=X$Oil_price,ask=FALSE)
+```
+
+##"Tuning" models
+Randomly split the whole dataset into 70 percent for training and 30 percent for testing. Using a usual least squares
+linear regression model, fit to the training data:
+```{r step 11}
+library(caTools)
+set.seed(101) 
+sample = sample.split(Z$Date, SplitRatio = .70)
+train = subset(Z, sample == TRUE)
+test  = subset(Z, sample == FALSE)
+
+attach(train)
+m6=lm(Open~Positive+Negative+USD_RMB+USD_EUR+`interest rate`+Oil_price)
+sm=summary(m6)
+sm
+detach(train)
+```
+
+Since MSE measures the average of the squares of the errors or deviations-that is, the difference between the estimator and what is estimated, we use MSE to identify the accuracy of our model.  
+$MSE=\frac{1}{n} \sum_{i=1}^n (\hat{y_i}-y_i)^2$   
+Compute the MSE of model when applied to the training data and to the testing data:
+```{r step 12}
+#Report the MSE of model when applied to the training data.
+mse <- function(sm) {
+  mean(sm$residuals^2)
+}
+mse(sm)
+
+#Report the MSE of your model when applied to the testing data. 
+y_hat <- predict(m6, test)
+y=test$Open
+mean((y_hat-y)^2)
+```
+```{r step 13}
+library(caret)
+# define training control
+#train_control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+#model <- train(Open~Positive+Negative+USD_RMB+USD_EUR+`interest rate`+Oil_price, data=Z, trControl=train_control, method="nb")
+# summarize results
+#print(model)
+```
+
+##Time series data
+It is common statistical practice to look at values of the correlation between $Y$ and the various values of lagged $Y$ for different periods.  
+Such values are called **autocorelations**:  
+$Autocorrelation(l)=\frac{\sum_{t=l+1}^n(y_t-\hat{y})(y_{t-l}-\hat{y})}{\sum_{t=1}^n(y_t-\hat{y})^2}$
+
+```{r step 14}
+attach(Z)
+acf(Open)
+```
+
+The dashed lines correspond to $-2/\sqrt{n}$ and $2/\sqrt{n}$, since autocorrelations are declared to be statistically significantly different from zero.
